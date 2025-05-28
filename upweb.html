@@ -1,0 +1,268 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Upload de Arquivos do Projeto</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script>
+    tailwind.config = {
+      darkMode: 'class',
+      theme: {
+        extend: {
+          colors: {
+            primary: '#5D5CDE',
+          }
+        }
+      }
+    }
+
+    // Detectar preferência de modo escuro
+    if (window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches) {
+      document.documentElement.classList.add('dark');
+    }
+    
+    window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change', event => {
+      if (event.matches) {
+        document.documentElement.classList.add('dark');
+      } else {
+        document.documentElement.classList.remove('dark');
+      }
+    });
+  </script>
+</head>
+<body class="bg-white dark:bg-gray-900 text-gray-800 dark:text-gray-200 min-h-screen">
+  <div class="container mx-auto px-4 py-8 max-w-4xl">
+    <h1 class="text-3xl font-bold mb-6 text-primary">Upload de Arquivos do Projeto</h1>
+    
+    <div class="mb-8">
+      <div class="bg-gray-50 dark:bg-gray-800 rounded-lg p-6 border-2 border-dashed border-gray-300 dark:border-gray-700 hover:border-primary dark:hover:border-primary transition-colors" id="dropZone">
+        <div class="text-center">
+          <svg xmlns="http://www.w3.org/2000/svg" class="mx-auto h-12 w-12 text-gray-400 dark:text-gray-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12" />
+          </svg>
+          <p class="mt-2 text-lg font-medium">Arraste e solte arquivos ou pastas aqui</p>
+          <p class="text-sm text-gray-500 dark:text-gray-400">ou</p>
+          <div class="mt-2 flex justify-center">
+            <label class="inline-flex items-center px-4 py-2 border border-transparent text-base font-medium rounded-md shadow-sm text-white bg-primary hover:bg-opacity-90 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary cursor-pointer">
+              Selecionar Arquivo
+              <input id="fileInput" type="file" class="hidden" multiple /> </label>
+            <label class="ml-4 inline-flex items-center px-4 py-2 border border-transparent text-base font-medium rounded-md shadow-sm text-white bg-primary hover:bg-opacity-90 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary cursor-pointer">
+              Selecionar Pasta
+              <input id="folderInput" type="file" webkitdirectory directory multiple class="hidden" />
+            </label>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="bg-white dark:bg-gray-800 rounded-lg shadow p-6 mb-6" id="uploadProgress" style="display: none;">
+      <h2 class="text-xl font-semibold mb-3">Progresso do Upload</h2>
+      <div class="w-full bg-gray-200 dark:bg-gray-700 rounded-full h-4 mb-2">
+        <div id="progressBar" class="bg-primary h-4 rounded-full" style="width: 0%"></div>
+      </div>
+      <div class="flex justify-between text-sm">
+        <span id="progressText">0%</span>
+        <span id="fileCount">0 arquivos</span>
+      </div>
+    </div>
+    
+    <div class="bg-white dark:bg-gray-800 rounded-lg shadow p-6" id="fileListContainer" style="display: none;">
+      <h2 class="text-xl font-semibold mb-3">Arquivos Carregados (Servidor)</h2>
+      <ul id="fileList" class="divide-y divide-gray-200 dark:divide-gray-700"></ul>
+    </div>
+
+    <div id="statusMessage" class="hidden mt-4 p-3 rounded-md text-center"></div>
+
+  </div>
+
+  <script>
+    document.addEventListener('DOMContentLoaded', function() {
+      const dropZone = document.getElementById('dropZone');
+      const fileInput = document.getElementById('fileInput');
+      const folderInput = document.getElementById('folderInput');
+      const uploadProgress = document.getElementById('uploadProgress');
+      const progressBar = document.getElementById('progressBar');
+      const progressText = document.getElementById('progressText');
+      const fileCount = document.getElementById('fileCount');
+      const fileListContainer = document.getElementById('fileListContainer');
+      const fileList = document.getElementById('fileList');
+      const statusMessage = document.getElementById('statusMessage');
+      
+      let filesToUpload = []; // Array para armazenar os arquivos a serem enviados
+      
+      // Funções auxiliares
+      function updateProgress(processed, total) {
+        const percentage = total > 0 ? Math.round((processed / total) * 100) : 0;
+        progressBar.style.width = `${percentage}%`;
+        progressText.textContent = `${percentage}%`;
+        fileCount.textContent = `${processed} de ${total} arquivos`;
+      }
+
+      function showStatusMessage(message, type = 'success') {
+          statusMessage.textContent = message;
+          statusMessage.classList.remove('hidden', 'bg-green-100', 'text-green-800', 'bg-red-100', 'text-red-800');
+          if (type === 'success') {
+              statusMessage.classList.add('bg-green-100', 'text-green-800');
+          } else {
+              statusMessage.classList.add('bg-red-100', 'text-red-800');
+          }
+          setTimeout(() => {
+              statusMessage.classList.add('hidden');
+          }, 5000);
+      }
+      
+      function displayUploadedFiles(files) {
+        fileList.innerHTML = '';
+        if (files.length === 0) {
+            fileListContainer.style.display = 'none';
+            return;
+        }
+
+        fileListContainer.style.display = 'block';
+        files.forEach((file) => {
+          const listItem = document.createElement('li');
+          listItem.className = 'py-3 flex items-center justify-between';
+          
+          const fileInfo = document.createElement('div');
+          fileInfo.className = 'flex items-center';
+          
+          const iconSvg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
+          iconSvg.setAttribute('class', 'h-6 w-6 text-gray-400 dark:text-gray-500 mr-3');
+          iconSvg.setAttribute('fill', 'none');
+          iconSvg.setAttribute('viewBox', '0 0 24 24');
+          iconSvg.setAttribute('stroke', 'currentColor');
+          
+          const iconPath = document.createElementNS('http://www.w3.org/2000/svg', 'path');
+          iconPath.setAttribute('stroke-linecap', 'round');
+          iconPath.setAttribute('stroke-linejoin', 'round');
+          iconPath.setAttribute('stroke-width', '2');
+          
+          if (file.endsWith('.zip')) { // Assumindo que 'file' aqui é o nome do arquivo
+            iconPath.setAttribute('d', 'M5 8h14M5 8a2 2 0 110-4h14a2 2 0 110 4M5 8v10a2 2 0 002 2h10a2 2 0 002-2V8m-9 4h4');
+          } else {
+            iconPath.setAttribute('d', 'M7 21h10a2 2 0 002-2V9.414a1 1 0 00-.293-.707l-5.414-5.414A1 1 0 0012.586 3H7a2 2 0 00-2 2v14a2 2 0 002 2z');
+          }
+          
+          iconSvg.appendChild(iconPath);
+          fileInfo.appendChild(iconSvg);
+          
+          const fileDetails = document.createElement('div');
+          fileDetails.className = 'flex flex-col';
+          
+          const fileName = document.createElement('span');
+          fileName.className = 'text-sm font-medium';
+          fileName.textContent = file; // Mostrar o nome do arquivo
+          
+          // Se você quiser mostrar o tamanho ou outras infos, precisaria do objeto File completo.
+          // Como a resposta do servidor só dá os nomes, não temos essas infos aqui.
+          // const fileSize = document.createElement('span');
+          // fileSize.className = 'text-xs text-gray-500 dark:text-gray-400';
+          // fileSize.textContent = formatFileSize(file.size);
+          // fileDetails.appendChild(fileSize);
+
+          fileDetails.appendChild(fileName);
+          fileInfo.appendChild(fileDetails);
+          
+          // O botão remover agora teria que interagir com o servidor para deletar.
+          // Por simplicidade, vou removê-lo ou mantê-lo apenas para exibição local.
+          // const removeBtn = document.createElement('button');
+          // removeBtn.className = 'text-red-500 hover:text-red-700 dark:text-red-400 dark:hover:text-red-300 text-sm';
+          // removeBtn.textContent = 'Remover';
+          // listItem.appendChild(removeBtn);
+          
+          listItem.appendChild(fileInfo);
+          fileList.appendChild(listItem);
+        });
+      }
+      
+      // Nova função para enviar os arquivos para o servidor
+      async function uploadSelectedFiles() {
+        if (filesToUpload.length === 0) {
+          showStatusMessage('Nenhum arquivo para enviar.', 'error');
+          return;
+        }
+
+        uploadProgress.style.display = 'block';
+        updateProgress(0, filesToUpload.length);
+
+        const formData = new FormData();
+        filesToUpload.forEach(file => {
+          formData.append('projectFiles', file); // 'projectFiles' deve corresponder ao nome no Multer
+        });
+
+        try {
+          const response = await fetch('/upload', {
+            method: 'POST',
+            body: formData,
+            // Não defina Content-Type aqui; o navegador faz isso automaticamente para FormData
+          });
+
+          if (!response.ok) {
+            throw new Error(`Erro no servidor: ${response.statusText}`);
+          }
+
+          const result = await response.json();
+          console.log('Upload bem-sucedido:', result);
+          showStatusMessage(`Upload realizado: ${result.files.join(', ')}`, 'success');
+          
+          // Limpa os arquivos para upload e exibe os que foram de fato enviados
+          filesToUpload = []; 
+          displayUploadedFiles(result.files); // Exibe os nomes dos arquivos recebidos do servidor
+
+        } catch (error) {
+          console.error('Erro no upload:', error);
+          showStatusMessage(`Erro no upload: ${error.message}`, 'error');
+          // Limpa o progresso e a lista se houver erro
+          displayUploadedFiles([]); 
+        } finally {
+          uploadProgress.style.display = 'none';
+        }
+      }
+      
+      function handleFilesSelection(files) {
+        filesToUpload = Array.from(files); // Armazena os arquivos selecionados
+        showStatusMessage(`${filesToUpload.length} arquivo(s) selecionado(s). Clique ou arraste novamente para substituir.`, 'info');
+        // Você pode adicionar uma pré-visualização ou lista de arquivos "prontos para upload" aqui se quiser
+        displayUploadedFiles(filesToUpload.map(f => f.name)); // Exibe os nomes dos arquivos selecionados localmente
+      }
+      
+      // Event listeners
+      dropZone.addEventListener('dragover', (e) => {
+        e.preventDefault();
+        dropZone.classList.add('border-primary', 'dark:border-primary');
+      });
+      
+      dropZone.addEventListener('dragleave', () => {
+        dropZone.classList.remove('border-primary', 'dark:border-primary');
+      });
+      
+      dropZone.addEventListener('drop', async (e) => {
+        e.preventDefault();
+        dropZone.classList.remove('border-primary', 'dark:border-primary');
+        
+        const files = e.dataTransfer.files;
+        handleFilesSelection(files);
+        // Após selecionar, chame a função de upload
+        await uploadSelectedFiles();
+      });
+      
+      fileInput.addEventListener('change', async (e) => {
+        if (e.target.files.length > 0) {
+          handleFilesSelection(e.target.files);
+          // Após selecionar, chame a função de upload
+          await uploadSelectedFiles();
+        }
+      });
+      
+      folderInput.addEventListener('change', async (e) => {
+        if (e.target.files.length > 0) {
+          handleFilesSelection(e.target.files);
+          // Após selecionar, chame a função de upload
+          await uploadSelectedFiles();
+        }
+      });
+    });
+  </script>
+</body>
+</html>
