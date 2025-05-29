@@ -46,7 +46,8 @@
           <div class="mt-2 flex justify-center">
             <label class="inline-flex items-center px-4 py-2 border border-transparent text-base font-medium rounded-md shadow-sm text-white bg-primary hover:bg-opacity-90 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary cursor-pointer">
               Selecionar Arquivo
-              <input id="fileInput" type="file" class="hidden" multiple /> </label>
+              <input id="fileInput" type="file" class="hidden" multiple />
+            </label>
             <label class="ml-4 inline-flex items-center px-4 py-2 border border-transparent text-base font-medium rounded-md shadow-sm text-white bg-primary hover:bg-opacity-90 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary cursor-pointer">
               Selecionar Pasta
               <input id="folderInput" type="file" webkitdirectory directory multiple class="hidden" />
@@ -68,7 +69,7 @@
     </div>
     
     <div class="bg-white dark:bg-gray-800 rounded-lg shadow p-6" id="fileListContainer" style="display: none;">
-      <h2 class="text-xl font-semibold mb-3">Arquivos Carregados (Servidor)</h2>
+      <h2 class="text-xl font-semibold mb-3">Arquivos Carregados</h2>
       <ul id="fileList" class="divide-y divide-gray-200 dark:divide-gray-700"></ul>
     </div>
 
@@ -89,9 +90,8 @@
       const fileList = document.getElementById('fileList');
       const statusMessage = document.getElementById('statusMessage');
       
-      let filesToUpload = []; // Array para armazenar os arquivos a serem enviados
+      let filesToUpload = []; 
       
-      // Funções auxiliares
       function updateProgress(processed, total) {
         const percentage = total > 0 ? Math.round((processed / total) * 100) : 0;
         progressBar.style.width = `${percentage}%`;
@@ -101,11 +101,13 @@
 
       function showStatusMessage(message, type = 'success') {
           statusMessage.textContent = message;
-          statusMessage.classList.remove('hidden', 'bg-green-100', 'text-green-800', 'bg-red-100', 'text-red-800');
+          statusMessage.classList.remove('hidden', 'bg-green-100', 'text-green-800', 'bg-red-100', 'text-red-800', 'bg-blue-100', 'text-blue-800');
           if (type === 'success') {
               statusMessage.classList.add('bg-green-100', 'text-green-800');
-          } else {
+          } else if (type === 'error') {
               statusMessage.classList.add('bg-red-100', 'text-red-800');
+          } else { // info
+              statusMessage.classList.add('bg-blue-100', 'text-blue-800');
           }
           setTimeout(() => {
               statusMessage.classList.add('hidden');
@@ -138,8 +140,13 @@
           iconPath.setAttribute('stroke-linejoin', 'round');
           iconPath.setAttribute('stroke-width', '2');
           
-          if (file.endsWith('.zip')) { // Assumindo que 'file' aqui é o nome do arquivo
+          // Melhorar a detecção de tipo de arquivo
+          if (file.endsWith('.zip') || file.endsWith('.rar') || file.endsWith('.7z')) {
             iconPath.setAttribute('d', 'M5 8h14M5 8a2 2 0 110-4h14a2 2 0 110 4M5 8v10a2 2 0 002 2h10a2 2 0 002-2V8m-9 4h4');
+          } else if (file.endsWith('.jpg') || file.endsWith('.png') || file.endsWith('.gif') || file.endsWith('.jpeg')) {
+            iconPath.setAttribute('d', 'M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z');
+          } else if (file.endsWith('.js') || file.endsWith('.html') || file.endsWith('.css') || file.endsWith('.json')) {
+            iconPath.setAttribute('d', 'M9 17v-2m3 2v-4m3 4v-6m2 10H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V17a2 2 0 01-2 2z');
           } else {
             iconPath.setAttribute('d', 'M7 21h10a2 2 0 002-2V9.414a1 1 0 00-.293-.707l-5.414-5.414A1 1 0 0012.586 3H7a2 2 0 00-2 2v14a2 2 0 002 2z');
           }
@@ -152,31 +159,16 @@
           
           const fileName = document.createElement('span');
           fileName.className = 'text-sm font-medium';
-          fileName.textContent = file; // Mostrar o nome do arquivo
-          
-          // Se você quiser mostrar o tamanho ou outras infos, precisaria do objeto File completo.
-          // Como a resposta do servidor só dá os nomes, não temos essas infos aqui.
-          // const fileSize = document.createElement('span');
-          // fileSize.className = 'text-xs text-gray-500 dark:text-gray-400';
-          // fileSize.textContent = formatFileSize(file.size);
-          // fileDetails.appendChild(fileSize);
+          fileName.textContent = file; 
 
           fileDetails.appendChild(fileName);
           fileInfo.appendChild(fileDetails);
-          
-          // O botão remover agora teria que interagir com o servidor para deletar.
-          // Por simplicidade, vou removê-lo ou mantê-lo apenas para exibição local.
-          // const removeBtn = document.createElement('button');
-          // removeBtn.className = 'text-red-500 hover:text-red-700 dark:text-red-400 dark:hover:text-red-300 text-sm';
-          // removeBtn.textContent = 'Remover';
-          // listItem.appendChild(removeBtn);
           
           listItem.appendChild(fileInfo);
           fileList.appendChild(listItem);
         });
       }
       
-      // Nova função para enviar os arquivos para o servidor
       async function uploadSelectedFiles() {
         if (filesToUpload.length === 0) {
           showStatusMessage('Nenhum arquivo para enviar.', 'error');
@@ -188,18 +180,18 @@
 
         const formData = new FormData();
         filesToUpload.forEach(file => {
-          formData.append('projectFiles', file); // 'projectFiles' deve corresponder ao nome no Multer
+          formData.append('projectFiles', file); 
         });
 
         try {
           const response = await fetch('/upload', {
             method: 'POST',
             body: formData,
-            // Não defina Content-Type aqui; o navegador faz isso automaticamente para FormData
           });
 
           if (!response.ok) {
-            throw new Error(`Erro no servidor: ${response.statusText}`);
+            const errorData = await response.json();
+            throw new Error(`Erro no servidor: ${errorData.message || response.statusText}`);
           }
 
           const result = await response.json();
@@ -208,12 +200,11 @@
           
           // Limpa os arquivos para upload e exibe os que foram de fato enviados
           filesToUpload = []; 
-          displayUploadedFiles(result.files); // Exibe os nomes dos arquivos recebidos do servidor
+          displayUploadedFiles(result.files); 
 
         } catch (error) {
           console.error('Erro no upload:', error);
           showStatusMessage(`Erro no upload: ${error.message}`, 'error');
-          // Limpa o progresso e a lista se houver erro
           displayUploadedFiles([]); 
         } finally {
           uploadProgress.style.display = 'none';
@@ -221,10 +212,10 @@
       }
       
       function handleFilesSelection(files) {
-        filesToUpload = Array.from(files); // Armazena os arquivos selecionados
-        showStatusMessage(`${filesToUpload.length} arquivo(s) selecionado(s). Clique ou arraste novamente para substituir.`, 'info');
-        // Você pode adicionar uma pré-visualização ou lista de arquivos "prontos para upload" aqui se quiser
-        displayUploadedFiles(filesToUpload.map(f => f.name)); // Exibe os nomes dos arquivos selecionados localmente
+        filesToUpload = Array.from(files); 
+        showStatusMessage(`${filesToUpload.length} arquivo(s) selecionado(s).`, 'info');
+        // Você pode comentar a linha abaixo se não quiser uma pré-visualização local antes do upload
+        // displayUploadedFiles(filesToUpload.map(f => f.name)); 
       }
       
       // Event listeners
@@ -234,6 +225,7 @@
       });
       
       dropZone.addEventListener('dragleave', () => {
+        e.preventDefault(); // Necessário para evitar que o navegador abra o arquivo
         dropZone.classList.remove('border-primary', 'dark:border-primary');
       });
       
@@ -243,14 +235,12 @@
         
         const files = e.dataTransfer.files;
         handleFilesSelection(files);
-        // Após selecionar, chame a função de upload
         await uploadSelectedFiles();
       });
       
       fileInput.addEventListener('change', async (e) => {
         if (e.target.files.length > 0) {
           handleFilesSelection(e.target.files);
-          // Após selecionar, chame a função de upload
           await uploadSelectedFiles();
         }
       });
@@ -258,7 +248,6 @@
       folderInput.addEventListener('change', async (e) => {
         if (e.target.files.length > 0) {
           handleFilesSelection(e.target.files);
-          // Após selecionar, chame a função de upload
           await uploadSelectedFiles();
         }
       });
