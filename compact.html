@@ -1,0 +1,410 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Compactar Arquivos do Projeto</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/FileSaver.js/2.0.5/FileSaver.min.js"></script>
+  <script>
+    tailwind.config = {
+      darkMode: 'class',
+      theme: {
+        extend: {
+          colors: {
+            primary: '#5D5CDE',
+          }
+        }
+      }
+    }
+
+    // Detectar preferência de modo escuro
+    if (window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches) {
+      document.documentElement.classList.add('dark');
+    }
+    
+    window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change', event => {
+      if (event.matches) {
+        document.documentElement.classList.add('dark');
+      } else {
+        document.documentElement.classList.remove('dark');
+      }
+    });
+  </script>
+  <style>
+    /* Estilos para a árvore de pastas */
+    .folder-toggle {
+      cursor: pointer;
+      display: inline-flex;
+      align-items: center;
+      margin-right: 0.5rem;
+    }
+    .folder-toggle svg {
+      transition: transform 0.2s ease-in-out;
+    }
+    /* Gira a seta quando a pasta está recolhida */
+    .folder-toggle.collapsed svg {
+      transform: rotate(-90deg);
+    }
+    .folder-content {
+      display: none; /* Conteúdo da pasta oculto por padrão */
+      padding-left: 1.5rem; /* Indentação para sub-itens */
+    }
+    .folder-content.expanded {
+      display: block; /* Mostra o conteúdo da pasta quando expandida */
+    }
+  </style>
+</head>
+<body class="bg-white dark:bg-gray-900 text-gray-800 dark:text-gray-200 min-h-screen">
+  <div class="container mx-auto px-4 py-8 max-w-4xl">
+    <h1 class="text-3xl font-bold mb-6 text-primary">Compactar Arquivos do Projeto</h1>
+    
+    <div class="bg-white dark:bg-gray-800 rounded-lg shadow p-6 mb-6">
+      <div class="flex flex-col md:flex-row md:items-center justify-between mb-6">
+        <h2 class="text-xl font-semibold mb-2 md:mb-0">Arquivos do Projeto</h2>
+        <div class="flex flex-col sm:flex-row gap-3">
+          <button id="selectAllBtn" class="px-4 py-2 bg-gray-200 dark:bg-gray-700 hover:bg-gray-300 dark:hover:bg-gray-600 rounded-md font-medium transition-colors">
+            Selecionar Todos
+          </button>
+          <button id="deselectAllBtn" class="px-4 py-2 bg-gray-200 dark:bg-gray-700 hover:bg-gray-300 dark:hover:bg-gray-600 rounded-md font-medium transition-colors">
+            Desmarcar Todos
+          </button>
+        </div>
+      </div>
+      
+      <div class="mb-4">
+        <input type="text" id="searchFiles" placeholder="Buscar arquivos..." class="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-700 text-base focus:outline-none focus:ring-2 focus:ring-primary">
+      </div>
+
+      <div class="max-h-80 overflow-y-auto border border-gray-200 dark:border-gray-700 rounded-md">
+        <ul id="fileTree" class="divide-y divide-gray-200 dark:divide-gray-700">
+          <li class="p-4 text-gray-500 dark:text-gray-400 text-center">Carregando estrutura do projeto...</li>
+        </ul>
+      </div>
+    </div>
+
+    <div class="bg-white dark:bg-gray-800 rounded-lg shadow p-6 mb-6">
+      <h2 class="text-xl font-semibold mb-4">Opções de Compactação</h2>
+      
+      <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+        <div>
+          <label for="zipName" class="block text-sm font-medium mb-1">Nome do Arquivo ZIP</label>
+          <input type="text" id="zipName" value="arquivos_compactados.zip" class="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-700 text-base focus:outline-none focus:ring-2 focus:ring-primary">
+        </div>
+        
+        <div>
+          <label for="compressionLevel" class="block text-sm font-medium mb-1">Nível de Compressão</label>
+          <select id="compressionLevel" class="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-700 text-base focus:outline-none focus:ring-2 focus:ring-primary">
+            <option value="0">Sem compressão (mais rápido)</option>
+            <option value="1">Baixa compressão</option>
+            <option value="5" selected>Compressão média</option>
+            <option value="9">Alta compressão (mais lento)</option>
+          </select>
+        </div>
+      </div>
+
+      <div class="mt-4">
+        <label class="inline-flex items-center">
+          <input type="checkbox" id="includeHidden" class="rounded text-primary focus:ring-primary">
+          <span class="ml-2">Incluir arquivos ocultos (começando com .)</span>
+        </label>
+      </div>
+    </div>
+
+    <div class="flex justify-center">
+      <button id="createZipBtn" class="px-6 py-3 bg-primary hover:bg-opacity-90 text-white font-medium rounded-lg shadow-sm focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary flex items-center">
+        <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
+        </svg>
+        Criar e Baixar ZIP
+      </button>
+    </div>
+
+    <div id="progressContainer" class="mt-6 bg-white dark:bg-gray-800 rounded-lg shadow p-6" style="display: none;">
+      <h2 class="text-xl font-semibold mb-3">Progresso</h2>
+      <div class="w-full bg-gray-200 dark:bg-gray-700 rounded-full h-4 mb-2">
+        <div id="progressBar" class="bg-primary h-4 rounded-full" style="width: 0%"></div>
+      </div>
+      <div class="flex justify-between text-sm">
+        <span id="progressText">0%</span>
+        <span id="progressStatus">Preparando arquivos...</span>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    document.addEventListener('DOMContentLoaded', function() {
+      // Elementos da interface
+      const fileTree = document.getElementById('fileTree');
+      const selectAllBtn = document.getElementById('selectAllBtn');
+      const deselectAllBtn = document.getElementById('deselectAllBtn');
+      const searchFiles = document.getElementById('searchFiles');
+      const zipName = document.getElementById('zipName');
+      const compressionLevel = document.getElementById('compressionLevel');
+      const includeHidden = document.getElementById('includeHidden');
+      const createZipBtn = document.getElementById('createZipBtn');
+      const progressContainer = document.getElementById('progressContainer');
+      const progressBar = document.getElementById('progressBar');
+      const progressText = document.getElementById('progressText');
+      const progressStatus = document.getElementById('progressStatus');
+
+      let projectStructure = []; // This will store the hierarchical structure from the server
+
+      // Function to fetch the project structure from the server
+      async function fetchProjectStructure() {
+        fileTree.innerHTML = '<li class="p-4 text-gray-500 dark:text-gray-400 text-center">Carregando estrutura do projeto...</li>';
+        try {
+          const response = await fetch('/api/project-structure');
+          if (!response.ok) {
+            throw new Error(`HTTP error! status: ${response.status}`);
+          }
+          projectStructure = await response.json();
+          renderFileTree(projectStructure, fileTree);
+        } catch (error) {
+          console.error('Erro ao buscar estrutura do projeto:', error);
+          fileTree.innerHTML = '<li class="p-4 text-red-500 text-center">Erro ao carregar estrutura do projeto. Verifique o console.</li>';
+        }
+      }
+
+      // Function to recursively render the file and folder tree
+      function renderFileTree(items, parentElement, level = 0) {
+        if (level === 0) { // Clear only on initial render
+            parentElement.innerHTML = ''; 
+        }
+
+        if (!items || items.length === 0) {
+            // Only show "No files found" if it's the top level and empty
+            if (level === 0) {
+              parentElement.innerHTML = '<li class="p-4 text-gray-500 dark:text-gray-400 text-center">Nenhum arquivo ou pasta encontrado no diretório.</li>';
+            }
+            return;
+        }
+
+        items.forEach(item => {
+          const isHidden = item.name.startsWith('.');
+          
+          if (!includeHidden.checked && isHidden) {
+            return; // Filter hidden items if the option is not checked
+          }
+
+          const listItem = document.createElement('li');
+          listItem.className = 'py-2 px-4'; // Padding for each item
+          listItem.dataset.path = item.path; // Full relative path from project root
+          listItem.dataset.type = item.type;
+          
+          const itemContent = document.createElement('div');
+          itemContent.className = `flex items-center`;
+          
+          const checkbox = document.createElement('input');
+          checkbox.type = 'checkbox';
+          checkbox.className = 'mr-3 rounded text-primary focus:ring-primary';
+          checkbox.checked = true; // By default, all selected
+          checkbox.dataset.path = item.path; // Store full path for selection
+          checkbox.dataset.type = item.type;
+          
+          const iconSvg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
+          iconSvg.setAttribute('class', 'h-5 w-5 text-gray-400 dark:text-gray-500 mr-2');
+          iconSvg.setAttribute('fill', 'none');
+          iconSvg.setAttribute('viewBox', '0 0 24 24');
+          iconSvg.setAttribute('stroke', 'currentColor');
+          
+          const iconPath = document.createElementNS('http://www.w3.org/2000/svg', 'path');
+          iconPath.setAttribute('stroke-linecap', 'round');
+          iconPath.setAttribute('stroke-linejoin', 'round');
+          iconPath.setAttribute('stroke-width', '2');
+          
+          if (item.type === 'folder') {
+            // Folder toggle for expand/collapse
+            const folderToggle = document.createElement('div');
+            folderToggle.className = 'folder-toggle collapsed'; // Start collapsed
+            folderToggle.innerHTML = `
+                <svg class="h-4 w-4 text-gray-400 dark:text-gray-500 mr-1 transform rotate-0" viewBox="0 0 20 20" fill="currentColor">
+                    <path fill-rule="evenodd" d="M5.293 7.293a1 1 0 011.414 0L10 10.586l3.293-3.293a1 1 0 111.414 1.414l-4 4a1 1 0 01-1.414 0l-4-4a1 1 0 010-1.414z" clip-rule="evenodd" />
+                </svg>
+            `;
+            iconPath.setAttribute('d', 'M3 7v10a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-6l-2-2H5a2 2 0 00-2 2z');
+            iconSvg.appendChild(iconPath);
+            folderToggle.appendChild(iconSvg);
+            itemContent.appendChild(folderToggle);
+
+            const folderContent = document.createElement('ul');
+            folderContent.className = 'folder-content'; // Hidden by default
+            listItem.appendChild(folderContent);
+
+            folderToggle.addEventListener('click', (e) => {
+                e.stopPropagation(); // Prevent checkbox from toggling
+                folderToggle.classList.toggle('collapsed');
+                folderContent.classList.toggle('expanded');
+            });
+
+          } else { // type === 'file'
+            iconPath.setAttribute('d', 'M7 21h10a2 2 0 002-2V9.414a1 1 0 00-.293-.707l-5.414-5.414A1 1 0 0012.586 3H7a2 2 0 00-2 2v14a2 2 0 002 2z');
+            iconSvg.appendChild(iconPath);
+            itemContent.appendChild(iconSvg);
+          }
+          
+          const textContainer = document.createElement('div');
+          textContainer.className = 'flex-1';
+          
+          const nameSpan = document.createElement('span');
+          nameSpan.className = `font-medium ${isHidden ? 'text-gray-400 dark:text-gray-500' : ''}`;
+          nameSpan.textContent = item.name; // <--- CORREÇÃO AQUI: Garante que o nome seja setado
+          
+          textContainer.appendChild(nameSpan); // <--- CORREÇÃO AQUI: Anexar o span de nome
+          
+          // Display size only for files
+          if (item.type === 'file' && item.size !== undefined) {
+            const sizeSpan = document.createElement('span');
+            sizeSpan.className = 'text-xs text-gray-500 dark:text-gray-400 ml-2';
+            sizeSpan.textContent = formatFileSize(item.size);
+            textContainer.appendChild(sizeSpan); // <--- CORREÇÃO AQUI: Anexar o span de tamanho
+          }
+          
+          itemContent.insertBefore(checkbox, itemContent.firstChild); // Ensure checkbox is always first
+          itemContent.appendChild(textContainer); // <--- CORREÇÃO AQUI: Anexar o container de texto ao itemContent
+          listItem.insertBefore(itemContent, listItem.firstChild);
+          parentElement.appendChild(listItem);
+
+          // Recursively render children if it's a folder
+          if (item.type === 'folder' && item.children && item.children.length > 0) {
+              const folderContentList = listItem.querySelector('.folder-content');
+              renderFileTree(item.children, folderContentList, level + 1);
+          }
+        });
+      }
+      
+      function formatFileSize(bytes) {
+        if (bytes === 0) return '0 Bytes';
+        
+        const k = 1024;
+        const sizes = ['Bytes', 'KB', 'MB', 'GB'];
+        const i = Math.floor(Math.log(bytes) / Math.log(k));
+        
+        return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
+      }
+      
+      function getSelectedItemsPaths() {
+        const checkboxes = document.querySelectorAll('input[type="checkbox"]:checked');
+        // Retorna todos os caminhos dos itens selecionados (arquivos ou pastas)
+        return Array.from(checkboxes).map(cb => cb.dataset.path);
+      }
+      
+      async function createAndDownloadZip() {
+        const selectedItems = getSelectedItemsPaths();
+        
+        if (selectedItems.length === 0) {
+          alert('Selecione pelo menos um arquivo ou pasta para compactar.');
+          return;
+        }
+        
+        const zipFilename = zipName.value.endsWith('.zip') ? zipName.value : `${zipName.value}.zip`;
+        const compression = parseInt(compressionLevel.value);
+
+        progressContainer.style.display = 'block';
+        progressBar.style.width = '0%';
+        progressText.textContent = '0%';
+        progressStatus.textContent = 'Solicitando compactação ao servidor...';
+        
+        createZipBtn.disabled = true;
+        createZipBtn.classList.add('opacity-70');
+        
+        try {
+          const response = await fetch('/api/create-zip', {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({
+              items: selectedItems,
+              zipName: zipFilename,
+              compressionLevel: compression
+            })
+          });
+          
+          if (!response.ok) {
+            const errorData = await response.json(); // Tenta ler JSON de erro
+            throw new Error(`Erro do servidor: ${errorData.message || response.statusText}`);
+          }
+
+          progressStatus.textContent = 'Baixando arquivo ZIP...';
+          progressBar.style.width = '75%'; // Simula progresso
+          progressText.textContent = '75%';
+
+          const blob = await response.blob();
+          saveAs(blob, zipFilename);
+          
+          progressBar.style.width = '100%';
+          progressText.textContent = '100%';
+          progressStatus.textContent = 'Download concluído!';
+          
+          setTimeout(() => {
+            progressContainer.style.display = 'none';
+            createZipBtn.disabled = false;
+            createZipBtn.classList.remove('opacity-70');
+          }, 3000);
+          
+        } catch (error) {
+          console.error('Erro ao criar o ZIP:', error);
+          progressStatus.textContent = `Erro: ${error.message}`;
+          setTimeout(() => {
+              progressContainer.style.display = 'none';
+              createZipBtn.disabled = false;
+              createZipBtn.classList.remove('opacity-70');
+          }, 3000);
+        }
+      }
+      
+      // Function to search and filter the displayed items
+      // This is a simplified search that shows/hides list items based on name/path.
+      // For proper hierarchical search (expanding parents if a child matches),
+      // a more complex state management would be needed.
+      function searchInFileTree() {
+        const searchTerm = searchFiles.value.toLowerCase();
+        const allListItems = document.querySelectorAll('#fileTree li'); // Get all <li> elements
+        
+        allListItems.forEach(listItem => {
+          const itemNameSpan = listItem.querySelector('span.font-medium');
+          const itemName = itemNameSpan ? itemNameSpan.textContent.toLowerCase() : '';
+          const itemPath = listItem.dataset.path ? listItem.dataset.path.toLowerCase() : '';
+          
+          if (itemName.includes(searchTerm) || itemPath.includes(searchTerm)) {
+            listItem.style.display = ''; // Show item
+            // Optional: If an item matches, ensure its parent folders are expanded
+            // This would involve traversing up the DOM to find parent .folder-content and add .expanded class
+          } else {
+            listItem.style.display = 'none'; // Hide item
+          }
+        });
+      }
+      
+      // Event listeners
+      selectAllBtn.addEventListener('click', () => {
+        const checkboxes = document.querySelectorAll('input[type="checkbox"]');
+        checkboxes.forEach(cb => {
+            // Only select if the item is currently visible (not hidden by search)
+            if (cb.closest('li').style.display !== 'none') {
+                cb.checked = true;
+            }
+        });
+      });
+      
+      deselectAllBtn.addEventListener('click', () => {
+        const checkboxes = document.querySelectorAll('input[type="checkbox"]');
+        checkboxes.forEach(cb => cb.checked = false);
+      });
+      
+      searchFiles.addEventListener('input', searchInFileTree);
+      
+      includeHidden.addEventListener('change', () => {
+        // Re-fetch and re-render to apply hidden file filter
+        fetchProjectStructure(); 
+      });
+      
+      createZipBtn.addEventListener('click', createAndDownloadZip);
+      
+      // Initialize the interface by fetching the project structure
+      fetchProjectStructure();
+    });
+  </script>
+</body>
+</html>
