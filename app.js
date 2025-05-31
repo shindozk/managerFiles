@@ -28,11 +28,19 @@ const storage = multer.diskStorage({
   },
   filename: function (req, file, cb) {
     const uniqueSuffix = Date.now() + '-' + Math.round(Math.random() * 1E9);
+    // Usa o nome do campo original (e.g., 'projectFiles') + sufixo único + extensão original
     cb(null, file.fieldname + '-' + uniqueSuffix + path.extname(file.originalname));
   }
 });
 
-const upload = multer({ storage: storage });
+// Configure Multer com limites de tamanho de arquivo
+const upload = multer({
+  storage: storage,
+  limits: {
+    fileSize: 1024 * 1024 * 500, // Exemplo: limite de 500 MB por arquivo (ajuste conforme necessário)
+    files: 100 // Permite até 100 arquivos no total por requisição (ajuste conforme necessário)
+  }
+});
 
 // --- Middleware para servir arquivos estáticos ---
 // A pasta 'public' (se você tiver) e a pasta 'uploads'
@@ -43,7 +51,7 @@ app.use('/uploads', express.static(uploadDir)); // Serve os arquivos da pasta 'u
 app.use(express.json());
 
 // --- Rota para a página de upload (upload.html) ---
-app.get('/', (req, res) => {
+app.get('/upload-page', (req, res) => {
   res.sendFile(path.join(__dirname, 'upload.html'));
 });
 
@@ -53,7 +61,8 @@ app.get('/compact-page', (req, res) => {
 });
 
 // --- Rota para lidar com o upload de arquivos ---
-app.post('/upload', upload.array('files', 10), (req, res) => {
+// CORREÇÃO: Multer agora espera o campo 'projectFiles'
+app.post('/upload', upload.array('projectFiles', 100), (req, res) => { // 'projectFiles' é o nome do campo no FormData
   if (req.files && req.files.length > 0) {
     const uploadedFileNames = req.files.map(file => file.filename);
     res.status(200).json({
@@ -67,15 +76,15 @@ app.post('/upload', upload.array('files', 10), (req, res) => {
 });
 
 // --- Função para construir a estrutura de arquivos recursivamente ---
-// Ignora 'node_modules', '.git', e qualquer arquivo/pasta oculto
-const ignoredPaths = ['node_modules', '.git', 'uploads']; // Adicionado 'uploads' para evitar listar duas vezes ou recursão
+// Ignora 'node_modules', '.git', e a pasta 'uploads' para evitar recursão ou listar arquivos temporários
+const ignoredPaths = ['node_modules', '.git', 'uploads'];
 const buildFileTree = async (currentPath, relativePath = '') => {
     const dirents = await fs.promises.readdir(currentPath, { withFileTypes: true });
     const items = [];
 
     for (const dirent of dirents) {
-        // Ignora pastas e arquivos na lista de ignorados, e arquivos/pastas ocultos
-        if (ignoredPaths.includes(dirent.name) || dirent.name.startsWith('.')) {
+        // Ignora pastas e arquivos na lista de ignorados
+        if (ignoredPaths.includes(dirent.name)) {
             continue;
         }
 
@@ -110,7 +119,7 @@ app.get('/api/project-structure', async (req, res) => {
     try {
         const projectStructure = await buildFileTree(__dirname, ''); // Começa da raiz do projeto
         console.log('--- Estrutura do Projeto Encontrada (Log do Servidor) ---');
-        console.log(JSON.stringify(projectStructure, null, 2)); // Log para depuração
+        // console.log(JSON.stringify(projectStructure, null, 2)); // Descomente para depuração
         console.log('---------------------------------------------------------');
         res.json(projectStructure);
 
@@ -134,14 +143,16 @@ app.post('/api/create-zip', (req, res) => {
         zlib: { level: compressionLevel }
     });
 
+    // Define o cabeçalho para download
     res.attachment(zipName);
+    // Pipe o arquivo ZIP diretamente para a resposta HTTP
     archive.pipe(res);
 
     archive.on('warning', function(err) {
         if (err.code === 'ENOENT') {
             console.warn('Erro de arquivo não encontrado (aviso do archiver):', err.message);
         } else {
-            throw err;
+            console.error('Archiver warning:', err);
         }
     });
 
@@ -171,13 +182,13 @@ app.post('/api/create-zip', (req, res) => {
         }
     });
 
-    archive.finalize();
+    archive.finalize(); // Finaliza o arquivo ZIP
 });
 
 
 // --- Inicia o servidor ---
 app.listen(port, () => {
   console.log(`Servidor rodando em http://localhost:${port}`);
-  console.log(`Página de upload: http://localhost:${port}`);
+  console.log(`Página de upload: http://localhost:${port}/upload-page`);
   console.log(`Página de compactação: http://localhost:${port}/compact-page`);
 });
