@@ -130,6 +130,9 @@
         <span id="progressStatus">Preparando arquivos...</span>
       </div>
     </div>
+
+    <div id="statusMessage" class="hidden mt-4 p-3 rounded-md text-center"></div>
+
   </div>
 
   <script>
@@ -147,8 +150,26 @@
       const progressBar = document.getElementById('progressBar');
       const progressText = document.getElementById('progressText');
       const progressStatus = document.getElementById('progressStatus');
+      const statusMessage = document.getElementById('statusMessage'); // Adicionado
 
       let projectStructure = []; // This will store the hierarchical structure from the server
+
+      // Função para exibir mensagens de status
+      function showStatusMessage(message, type = 'success') {
+          statusMessage.textContent = message;
+          statusMessage.classList.remove('hidden', 'bg-green-100', 'text-green-800', 'bg-red-100', 'text-red-800', 'bg-blue-100', 'text-blue-800');
+          if (type === 'success') {
+              statusMessage.classList.add('bg-green-100', 'text-green-800');
+          } else if (type === 'error') {
+              statusMessage.classList.add('bg-red-100', 'text-red-800');
+          } else { // info
+              statusMessage.classList.add('bg-blue-100', 'text-blue-800');
+          }
+          statusMessage.classList.remove('hidden'); // Ensure it's visible
+          setTimeout(() => {
+              statusMessage.classList.add('hidden');
+          }, 5000);
+      }
 
       // Function to fetch the project structure from the server
       async function fetchProjectStructure() {
@@ -163,6 +184,7 @@
         } catch (error) {
           console.error('Erro ao buscar estrutura do projeto:', error);
           fileTree.innerHTML = '<li class="p-4 text-red-500 text-center">Erro ao carregar estrutura do projeto. Verifique o console.</li>';
+          showStatusMessage('Erro ao carregar estrutura do projeto.', 'error');
         }
       }
 
@@ -248,20 +270,20 @@
           
           const nameSpan = document.createElement('span');
           nameSpan.className = `font-medium ${isHidden ? 'text-gray-400 dark:text-gray-500' : ''}`;
-          nameSpan.textContent = item.name; // <--- CORREÇÃO AQUI: Garante que o nome seja setado
+          nameSpan.textContent = item.name;
           
-          textContainer.appendChild(nameSpan); // <--- CORREÇÃO AQUI: Anexar o span de nome
+          textContainer.appendChild(nameSpan);
           
           // Display size only for files
           if (item.type === 'file' && item.size !== undefined) {
             const sizeSpan = document.createElement('span');
             sizeSpan.className = 'text-xs text-gray-500 dark:text-gray-400 ml-2';
             sizeSpan.textContent = formatFileSize(item.size);
-            textContainer.appendChild(sizeSpan); // <--- CORREÇÃO AQUI: Anexar o span de tamanho
+            textContainer.appendChild(sizeSpan);
           }
           
           itemContent.insertBefore(checkbox, itemContent.firstChild); // Ensure checkbox is always first
-          itemContent.appendChild(textContainer); // <--- CORREÇÃO AQUI: Anexar o container de texto ao itemContent
+          itemContent.appendChild(textContainer);
           listItem.insertBefore(itemContent, listItem.firstChild);
           parentElement.appendChild(listItem);
 
@@ -293,7 +315,7 @@
         const selectedItems = getSelectedItemsPaths();
         
         if (selectedItems.length === 0) {
-          alert('Selecione pelo menos um arquivo ou pasta para compactar.');
+          showStatusMessage('Selecione pelo menos um arquivo ou pasta para compactar.', 'error'); // Usando showStatusMessage
           return;
         }
         
@@ -336,6 +358,7 @@
           progressBar.style.width = '100%';
           progressText.textContent = '100%';
           progressStatus.textContent = 'Download concluído!';
+          showStatusMessage('Arquivo ZIP criado e baixado com sucesso!', 'success'); // Mensagem de sucesso
           
           setTimeout(() => {
             progressContainer.style.display = 'none';
@@ -346,6 +369,7 @@
         } catch (error) {
           console.error('Erro ao criar o ZIP:', error);
           progressStatus.textContent = `Erro: ${error.message}`;
+          showStatusMessage(`Erro ao criar o ZIP: ${error.message}`, 'error'); // Mensagem de erro
           setTimeout(() => {
               progressContainer.style.display = 'none';
               createZipBtn.disabled = false;
